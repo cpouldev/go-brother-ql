@@ -1,0 +1,25 @@
+go-brother-ql
+Copyright (C) 2026 cpouldev and contributors
+
+This project is a Go port and derivative of brother_ql by Philipp Klaus and
+contributors: https://github.com/pklaus/brother_ql
+Upstream revision used: 0dee94b5fc3721159bae556b8bd2d975f92b7b8b
+
+The printer/media catalogs, raster protocol implementation, and reference
+fixtures derive from that project's work. Credit for the original library and
+its reverse engineering belongs to Philipp Klaus and the upstream contributors.
+The upstream project declares GPL version 3 or later in its package metadata.
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program. If not, see https://www.gnu.org/licenses/.
+
+Go dependencies retain their respective licenses. Direct USB builds link
+libusb; its license and source are available at https://libusb.info/.
