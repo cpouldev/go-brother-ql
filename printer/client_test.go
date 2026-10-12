@@ -430,3 +430,36 @@ func TestCloseCancelsPendingStatus(t *testing.T) {
 		t.Fatal("close left status blocked")
 	}
 }
+
+func TestPrintReportsStatusBeforeTerminalError(t *testing.T) {
+	s := newScript()
+	s.input <- statusFrame(StatusReply, 0, 0)
+	s.writeFn = func(ctx context.Context, data []byte) (int, error) {
+		if bytes.Equal(data, []byte{0x1b, 0x69, 0x53}) {
+			return len(data), nil
+		}
+		s.input <- statusFrame(StatusNotification, 1, CoolingStarted)
+		s.input <- statusFrame(StatusNotification, 1, CoolingFinished)
+		s.input <- statusFrame(StatusCompleted, 0, 0)
+		fault := statusFrame(StatusError, 1, 0)
+		fault[9] = 16
+		s.input <- fault
+		<-ctx.Done()
+		return 2, ctx.Err()
+	}
+	c := NewClient(s)
+	defer c.Close()
+	var statuses []Status
+	r, err := c.Print(timeout(t), bytes.NewBufferString("job"), PrintOptions{
+		Wait: true, Pages: 2, OnStatus: func(s Status) { statuses = append(statuses, s) },
+	})
+	if err == nil || r.BytesSent != 2 || r.PagesPrinted != 1 {
+		t.Fatalf("result=%+v error=%v", r, err)
+	}
+	if len(statuses) != 5 {
+		t.Fatalf("status history has %d frames, want all 5 including cooling before failure", len(statuses))
+	}
+	if statuses[1].Notification != CoolingStarted || statuses[2].Notification != CoolingFinished || statuses[4].Raw[9] != 16 {
+		t.Fatalf("status sequence: %+v", statuses)
+	}
+}

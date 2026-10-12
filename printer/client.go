@@ -41,6 +41,10 @@ type PrintOptions struct {
 	// Nil skips the expected-media match, but readiness and media presence are
 	// still checked on transports that support status.
 	Media *Media
+	// OnStatus observes each decoded preflight and in-job status, including
+	// cooling and fault frames. Calls are serial and finish before Print returns.
+	// The callback must return promptly and must not call this Client's methods.
+	OnStatus func(Status)
 }
 
 // Result describes delivery and any observed printer completion. Print returns
@@ -304,6 +308,14 @@ func (c *Client) Print(ctx context.Context, r io.Reader, opt PrintOptions) (Resu
 	if opt.Pages == 0 {
 		opt.Pages = 1
 	}
+	reportStatus := func(s Status) {
+		if opt.OnStatus != nil {
+			// Observers own their copy; changing its errors must not affect the
+			// print session's fault classification.
+			s.Errors = append([]string(nil), s.Errors...)
+			opt.OnStatus(s)
+		}
+	}
 	statusEnabled := c.transport.SupportsStatus()
 	if opt.Wait && !statusEnabled {
 		return result, ErrStatusUnsupported
@@ -311,6 +323,9 @@ func (c *Client) Print(ctx context.Context, r io.Reader, opt PrintOptions) (Resu
 	if statusEnabled {
 		s, err := c.status(op)
 		result.LastStatus = &s
+		if s.Raw[0] == 0x80 {
+			reportStatus(s)
+		}
 		if err != nil {
 			return result, err
 		}
@@ -335,6 +350,7 @@ func (c *Client) Print(ctx context.Context, r io.Reader, opt PrintOptions) (Resu
 				if job.Err() != nil {
 					return
 				}
+				decoded := err == nil
 				state.mu.Lock()
 				if err == nil {
 					state.result.LastStatus = &s
@@ -357,6 +373,9 @@ func (c *Client) Print(ctx context.Context, r io.Reader, opt PrintOptions) (Resu
 				complete := opt.Wait && state.result.PagesPrinted >= opt.Pages
 				state.signal()
 				state.mu.Unlock()
+				if decoded {
+					reportStatus(s)
+				}
 				if err != nil {
 					cancel()
 					return
